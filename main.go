@@ -144,21 +144,36 @@ const textboxTmpl = `<!DOCTYPE html>
        html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
        form { height: 100%; display: flex; flex-direction: column; }
        textarea { display: block; flex: 1; resize: none; padding: 1rem 1.3rem; border: none; font: 1rem/1.5 monospace; }
-       time { width: 100%; text-align: right; color: silver; font: .8rem monospace; margin: .5rem 0 .5rem -.7rem; }
+       form div { display: flex; justify-content: space-between; margin: .5rem .7rem; }
+       button { border: 1px solid; color: blue; background: none; border-radius: .2rem; padding: .2rem .5rem; }
+       button:not(:disabled):hover { background: blue; color: white; border-color: black; }
+       button:not(:disabled):active { box-shadow: 0 0 0 3px orange; }
+       button:disabled { color: silver; }
+       time { color: silver; font: .8rem monospace; }
     </style>
   </head>
   <body>
     <form action="/" method="post">
       <textarea name="textbox">{{ .Content }}</textarea>
-      <time>{{ .UpdatedAt }}</time>
+      <div>
+        <button type="submit" disabled>Save</button>
+        <time>{{ .UpdatedAt }}</time>
+      </div>
     </form>
     <script>
       const form = document.querySelector('form');
-      document.onkeydown = (event) => {
+      const button = document.querySelector('button');
+
+      function save(event) {
         if ((event.ctrlKey || event.metaKey) && String.fromCharCode(event.which).toLowerCase() === 's') {
           event.preventDefault();
           form.submit();
         }
+      }
+
+      document.onkeydown = (event) => {
+        button.disabled = false;
+        document.onkeydown = save;
       };
     </script>
   </body>

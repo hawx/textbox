@@ -17,6 +17,7 @@ golang.org/x/net v0.0.0-20190213061140-3a22650c66bd h1:HuTn7WObtcDo9uEEU7rEqL0jY
 golang.org/x/net v0.0.0-20190213061140-3a22650c66bd/go.mod h1:mL1N/T3taQHkDXs73rZJwtUhF3w3ftmwwsq0BUmARs4=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/yaml.v2 v2.2.2/go.mod h1:hI93XBmqTisBFMUTm0b8Fm+jr3Dg1NNxqwp+5A1VGuI=
+hawx.me/code/assert v0.0.0-20150803185601-4570da094475 h1:Bj8b81kYHaxzLu9dRxyRKrmZTujQzD5ccWkUTHUdpBg=
 hawx.me/code/assert v0.0.0-20150803185601-4570da094475/go.mod h1:T9mMMImeViZqsnBMFwbc0TbTlDb+bwAPF0PUJpjam6s=
 hawx.me/code/indieauth v1.0.1 h1:QkwWqTXDPlPZ7d8TgtvL8TTkg+CLNokb+/X1pk8uzu0=
 hawx.me/code/indieauth v1.0.1/go.mod h1:TYTLWey93ZhIFiHX/lqIlf2s5ADBsR4uVDcEK70/6wc=
