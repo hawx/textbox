@@ -140,12 +140,27 @@ const textboxTmpl = `<!DOCTYPE html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>textbox</title>
+    <style>
+       html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
+       form { height: 100%; display: flex; flex-direction: column; }
+       textarea { display: block; flex: 1; resize: none; padding: 1rem 1.3rem; border: none; font: 1rem/1.5 monospace; }
+       time { width: 100%; text-align: right; color: silver; font: .8rem monospace; margin: .5rem 0 .5rem -.7rem; }
+    </style>
   </head>
   <body>
     <form action="/" method="post">
       <textarea name="textbox">{{ .Content }}</textarea>
-      <button type="submit">Save</button>
+      <time>{{ .UpdatedAt }}</time>
     </form>
+    <script>
+      const form = document.querySelector('form');
+      document.onkeydown = (event) => {
+        if ((event.ctrlKey || event.metaKey) && String.fromCharCode(event.which).toLowerCase() === 's') {
+          event.preventDefault();
+          form.submit();
+        }
+      };
+    </script>
   </body>
 </html>`
 
