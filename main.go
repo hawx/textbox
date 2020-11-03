@@ -14,7 +14,6 @@ import (
 
 	"hawx.me/code/indieauth"
 	"hawx.me/code/indieauth/sessions"
-	"hawx.me/code/mux"
 	"hawx.me/code/serve"
 )
 
@@ -71,14 +70,11 @@ func main() {
 		return
 	}
 
-	http.Handle("/", mux.Method{
-		http.MethodGet: session.Choose(
-			http.HandlerFunc(handleGet(db, tmpl)),
-			http.HandlerFunc(handleSignIn),
-		),
-		http.MethodPost: http.HandlerFunc(handlePost(db)),
-	})
+	http.Handle("/", session.Choose(
+		http.HandlerFunc(handleDisplay(db, tmpl)),
+		http.HandlerFunc(handleSignIn)))
 
+	http.HandleFunc("/save", session.Shield(handleSave(db)))
 	http.HandleFunc("/sign-in", session.SignIn())
 	http.HandleFunc("/callback", session.Callback())
 	http.HandleFunc("/sign-out", session.SignOut())
@@ -86,8 +82,13 @@ func main() {
 	serve.Serve(*port, *socket, http.DefaultServeMux)
 }
 
-func handleGet(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
+func handleDisplay(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "", http.StatusMethodNotAllowed)
+			return
+		}
+
 		row := db.QueryRowContext(
 			r.Context(),
 			"SELECT content, updated_at FROM textbox")
@@ -111,11 +112,21 @@ func handleGet(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 }
 
 func handleSignIn(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "", http.StatusMethodNotAllowed)
+		return
+	}
+
 	io.WriteString(w, signInTmpl)
 }
 
-func handlePost(db *sql.DB) http.HandlerFunc {
+func handleSave(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			http.Error(w, "", http.StatusMethodNotAllowed)
+			return
+		}
+
 		content := r.FormValue("textbox")
 		updatedAt := time.Now()
 
@@ -153,7 +164,7 @@ const textboxTmpl = `<!DOCTYPE html>
     </style>
   </head>
   <body>
-    <form action="/" method="post">
+    <form action="/save" method="post">
       <textarea name="textbox">{{ .Content }}</textarea>
       <div>
         <button type="submit" disabled>Save</button>
