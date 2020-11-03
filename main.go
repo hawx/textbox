@@ -31,30 +31,39 @@ func main() {
 
 	flag.Parse()
 
-	auth, err := indieauth.Authentication(*url, *url+"/callback")
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	session, err := sessions.New(*me, *secret, auth)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	tmpl, err := template.New("textbox").Parse(textboxTmpl)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
 	db, err := sql.Open("sqlite3", *dbPath)
 	if err != nil {
 		log.Println(err)
 		return
 	}
 	defer db.Close()
+
+	mux, err := newMux(*url, *me, *secret, db)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	serve.Serve(*port, *socket, mux)
+}
+
+func newMux(url, me, secret string, db *sql.DB) (http.Handler, error) {
+	mux := http.NewServeMux()
+
+	auth, err := indieauth.Authentication(url, url+"/callback")
+	if err != nil {
+		return mux, err
+	}
+
+	session, err := sessions.New(me, secret, auth)
+	if err != nil {
+		return mux, err
+	}
+
+	tmpl, err := template.New("textbox").Parse(textboxTmpl)
+	if err != nil {
+		return mux, err
+	}
 
 	_, err = db.Exec(`
     CREATE TABLE IF NOT EXISTS textbox (
@@ -66,20 +75,19 @@ func main() {
     INSERT OR IGNORE INTO textbox(id, content, updated_at)
       VALUES (0, '', time('now'));`)
 	if err != nil {
-		log.Println(err)
-		return
+		return mux, err
 	}
 
-	http.Handle("/", session.Choose(
+	mux.Handle("/", session.Choose(
 		http.HandlerFunc(handleDisplay(db, tmpl)),
 		http.HandlerFunc(handleSignIn)))
+	mux.HandleFunc("/save", session.Shield(handleSave(db)))
 
-	http.HandleFunc("/save", session.Shield(handleSave(db)))
-	http.HandleFunc("/sign-in", session.SignIn())
-	http.HandleFunc("/callback", session.Callback())
-	http.HandleFunc("/sign-out", session.SignOut())
+	mux.HandleFunc("/sign-in", session.SignIn())
+	mux.HandleFunc("/callback", session.Callback())
+	mux.HandleFunc("/sign-out", session.SignOut())
 
-	serve.Serve(*port, *socket, http.DefaultServeMux)
+	return mux, nil
 }
 
 func handleDisplay(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
