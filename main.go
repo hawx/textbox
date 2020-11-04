@@ -205,6 +205,10 @@ const signInTmpl = `<!DOCTYPE html>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>textbox</title>
+    <style>
+      #cover { top: 0; left: 0; z-index: 1000; position: absolute; height: 100%; width: 100%; background: rgba(0, 255, 255, .7); }
+      #cover a { position: relative; display: block; left: 50%; top: 50%; text-align: center; width: 100px; margin-left: -50px; height: 50px; line-height: 50px; margin-top: -25px; font-size: 16px; font-weight: bold; border: 1px solid; }
+    </style>
   </head>
   <body>
     <div id="cover">
