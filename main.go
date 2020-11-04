@@ -31,38 +31,31 @@ func main() {
 
 	flag.Parse()
 
-	db, err := sql.Open("sqlite3", *dbPath)
+	if err := run(*port, *socket, *url, *me, *secret, *dbPath); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func run(port, socket, url, me, secret, dbPath string) error {
+	db, err := sql.Open("sqlite3", dbPath)
 	if err != nil {
-		log.Println(err)
-		return
+		return err
 	}
 	defer db.Close()
 
-	mux, err := newMux(*url, *me, *secret, db)
-	if err != nil {
-		log.Println(err)
-		return
-	}
-
-	serve.Serve(*port, *socket, mux)
-}
-
-func newMux(url, me, secret string, db *sql.DB) (http.Handler, error) {
-	mux := http.NewServeMux()
-
 	auth, err := indieauth.Authentication(url, url+"/callback")
 	if err != nil {
-		return mux, err
+		return err
 	}
 
 	session, err := sessions.New(me, secret, auth)
 	if err != nil {
-		return mux, err
+		return err
 	}
 
 	tmpl, err := template.New("textbox").Parse(textboxTmpl)
 	if err != nil {
-		return mux, err
+		return err
 	}
 
 	_, err = db.Exec(`
@@ -75,19 +68,20 @@ func newMux(url, me, secret string, db *sql.DB) (http.Handler, error) {
     INSERT OR IGNORE INTO textbox(id, content, updated_at)
       VALUES (0, '', time('now'));`)
 	if err != nil {
-		return mux, err
+		return err
 	}
 
-	mux.Handle("/", session.Choose(
-		http.HandlerFunc(handleDisplay(db, tmpl)),
-		http.HandlerFunc(handleSignIn)))
+	mux := http.NewServeMux()
+
+	mux.Handle("/", session.Choose(handleDisplay(db, tmpl), handleSignIn()))
 	mux.HandleFunc("/save", session.Shield(handleSave(db)))
 
 	mux.HandleFunc("/sign-in", session.SignIn())
 	mux.HandleFunc("/callback", session.Callback())
 	mux.HandleFunc("/sign-out", session.SignOut())
 
-	return mux, nil
+	serve.Serve(port, socket, mux)
+	return nil
 }
 
 func handleDisplay(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
@@ -119,13 +113,15 @@ func handleDisplay(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 	}
 }
 
-func handleSignIn(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "", http.StatusMethodNotAllowed)
-		return
-	}
+func handleSignIn() http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "", http.StatusMethodNotAllowed)
+			return
+		}
 
-	io.WriteString(w, signInTmpl)
+		io.WriteString(w, signInTmpl)
+	}
 }
 
 func handleSave(db *sql.DB) http.HandlerFunc {
@@ -173,7 +169,7 @@ const textboxTmpl = `<!DOCTYPE html>
   </head>
   <body>
     <form action="/save" method="post">
-      <textarea name="textbox">{{ .Content }}</textarea>
+      <textarea autofocus name="textbox">{{ .Content }}</textarea>
       <div>
         <button type="submit" disabled>Save</button>
         <time>{{ .UpdatedAt }}</time>
@@ -181,6 +177,7 @@ const textboxTmpl = `<!DOCTYPE html>
     </form>
     <script>
       const form = document.querySelector('form');
+      const textarea = document.querySelector('textarea');
       const button = document.querySelector('button');
 
       function save(event) {
@@ -194,6 +191,10 @@ const textboxTmpl = `<!DOCTYPE html>
         button.disabled = false;
         document.onkeydown = save;
       };
+
+      const len = textarea.value.length;
+      textarea.focus();
+      textarea.setSelectionRange(len, len);
     </script>
   </body>
 </html>`
