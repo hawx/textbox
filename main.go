@@ -12,8 +12,7 @@ import (
 	// register sqlite3 for database/sql
 	_ "github.com/mattn/go-sqlite3"
 
-	"hawx.me/code/indieauth"
-	"hawx.me/code/indieauth/sessions"
+	"hawx.me/code/indieauth/v2"
 	"hawx.me/code/serve"
 )
 
@@ -43,12 +42,10 @@ func run(port, socket, url, me, secret, dbPath string) error {
 	}
 	defer db.Close()
 
-	auth, err := indieauth.Authentication(url, url+"/callback")
-	if err != nil {
-		return err
-	}
-
-	session, err := sessions.New(me, secret, auth)
+	session, err := indieauth.NewSessions(secret, &indieauth.Config{
+		ClientID:    url,
+		RedirectURL: url + "/callback",
+	})
 	if err != nil {
 		return err
 	}
@@ -73,12 +70,40 @@ func run(port, socket, url, me, secret, dbPath string) error {
 
 	mux := http.NewServeMux()
 
-	mux.Handle("/", session.Choose(handleDisplay(db, tmpl), handleSignIn()))
-	mux.HandleFunc("/save", session.Shield(handleSave(db)))
+	choose := func(a, b http.Handler) http.HandlerFunc {
+		return func(w http.ResponseWriter, r *http.Request) {
+			if response, ok := session.SignedIn(r); ok && response.Me == me {
+				a.ServeHTTP(w, r)
+			} else {
+				b.ServeHTTP(w, r)
+			}
+		}
+	}
 
-	mux.HandleFunc("/sign-in", session.SignIn())
-	mux.HandleFunc("/callback", session.Callback())
-	mux.HandleFunc("/sign-out", session.SignOut())
+	signedIn := func(a http.Handler) http.HandlerFunc {
+		return choose(a, http.NotFoundHandler())
+	}
+
+	mux.Handle("/", choose(handleDisplay(db, tmpl), handleSignIn()))
+	mux.Handle("/save", signedIn(handleSave(db)))
+
+	mux.HandleFunc("/sign-in", func(w http.ResponseWriter, r *http.Request) {
+		if err := session.RedirectToSignIn(w, r, me); err != nil {
+			log.Println(err)
+		}
+	})
+	mux.HandleFunc("/callback", func(w http.ResponseWriter, r *http.Request) {
+		if err := session.Verify(w, r); err != nil {
+			log.Println(err)
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+	})
+	mux.HandleFunc("/sign-out", func(w http.ResponseWriter, r *http.Request) {
+		if err := session.SignOut(w, r); err != nil {
+			log.Println(err)
+		}
+		http.Redirect(w, r, "/", http.StatusFound)
+	})
 
 	serve.Serve(port, socket, mux)
 	return nil
