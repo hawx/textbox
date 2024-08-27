@@ -56,14 +56,14 @@ func run(port, socket, url, me, secret, dbPath string) error {
 	}
 
 	_, err = db.Exec(`
-    CREATE TABLE IF NOT EXISTS textbox (
-      id NUMBER PRIMARY KEY,
-      content TEXT,
-      updated_at DATETIME
-    );
+		CREATE TABLE IF NOT EXISTS textbox (
+			id NUMBER PRIMARY KEY,
+			content TEXT,
+			updated_at DATETIME
+		);
 
-    INSERT OR IGNORE INTO textbox(id, content, updated_at)
-      VALUES (0, '', time('now'));`)
+		INSERT OR IGNORE INTO textbox(id, content, updated_at)
+			VALUES (0, '', time('now'));`)
 	if err != nil {
 		return err
 	}
@@ -176,68 +176,92 @@ func handleSave(db *sql.DB) http.HandlerFunc {
 
 const textboxTmpl = `<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>textbox</title>
-    <style>
-       html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
-       form { height: 100%; display: flex; flex-direction: column; }
-       textarea { display: block; flex: 1; resize: none; padding: 1rem 1.3rem; border: none; font: 1rem/1.5 monospace; }
-       form div { display: flex; justify-content: space-between; margin: .5rem .7rem; }
-       button { border: 1px solid; color: blue; background: none; border-radius: .2rem; padding: .2rem .5rem; }
-       button:not(:disabled):hover { background: blue; color: white; border-color: black; }
-       button:not(:disabled):active { box-shadow: 0 0 0 3px orange; }
-       button:disabled { color: silver; }
-       time { color: silver; font: .8rem monospace; }
-    </style>
-  </head>
-  <body>
-    <form action="/save" method="post">
-      <textarea autofocus name="textbox">{{ .Content }}</textarea>
-      <div>
-        <button type="submit" disabled>Save</button>
-        <time>{{ .UpdatedAt }}</time>
-      </div>
-    </form>
-    <script>
-      const form = document.querySelector('form');
-      const textarea = document.querySelector('textarea');
-      const button = document.querySelector('button');
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>textbox</title>
+		<style>
+			 html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
+			 form { height: 100%; display: flex; flex-direction: column; }
+			 textarea { display: block; flex: 1; resize: none; padding: 1rem 1.3rem; border: none; font: 1rem/1.5 monospace; }
+			 textarea:focus { outline: none; }
+			 form div { display: flex; justify-content: space-between; margin: .5rem .7rem; }
+			 button { border: 1px solid; color: blue; background: none; border-radius: .2rem; padding: .2rem .5rem; }
+			 button:not(:disabled):hover { background: blue; color: white; border-color: black; }
+			 button:not(:disabled):active { box-shadow: 0 0 0 3px orange; }
+			 button:disabled { color: silver; }
+			 time { color: silver; font: .8rem monospace; }
+			 #menu { position: fixed; right: 1.3rem; text-align: right; list-style: none; font: 1rem/1.5 monospace; color: blue; padding-bottom: 1.5rem; }
+			 #menu:hover { background: white; }
+		</style>
+	</head>
+	<body>
+		<ul id="menu"></ul>
+		<form action="/save" method="post">
+			<textarea autofocus name="textbox">{{ .Content }}</textarea>
+			<div>
+				<button type="submit" disabled>Save</button>
+				<time>{{ .UpdatedAt }}</time>
+			</div>
+		</form>
+		<script>
+			const form = document.querySelector('form');
+			const textarea = document.querySelector('textarea');
+			const button = document.querySelector('button');
+			const menu = document.getElementById('menu');
 
-      function save(event) {
-        if ((event.ctrlKey || event.metaKey) && String.fromCharCode(event.which).toLowerCase() === 's') {
-          event.preventDefault();
-          form.submit();
-        }
-      }
+			function save(event) {
+				if ((event.ctrlKey || event.metaKey) && String.fromCharCode(event.which).toLowerCase() === 's') {
+					event.preventDefault();
+					form.submit();
+					headers();
+				}
+			}
 
-      document.onkeydown = (event) => {
-        button.disabled = false;
-        document.onkeydown = save;
-      };
+			function headers() {
+				const headerRe = new RegExp('# (.*)', 'g');
+				while (menu.firstChild) {
+					menu.removeChild(menu.lastChild);
+				}
 
-      const len = textarea.value.length;
-      textarea.focus();
-      textarea.setSelectionRange(len, len);
-    </script>
-  </body>
+				while ((match = headerRe.exec(textarea.value)) != null) {
+					const li = document.createElement('li');
+					li.textContent = match[1];
+					li.onclick = ((idx) => function() {
+						textarea.focus();
+						textarea.setSelectionRange(idx, idx);
+					})(match.index + match[0].length);
+					menu.appendChild(li);
+				}
+			}
+
+			document.onkeydown = (event) => {
+				button.disabled = false;
+				document.onkeydown = save;
+			};
+
+			const len = textarea.value.length;
+			textarea.focus();
+			textarea.setSelectionRange(len, len);
+			headers();
+		</script>
+	</body>
 </html>`
 
 const signInTmpl = `<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>textbox</title>
-    <style>
-      #cover { top: 0; left: 0; z-index: 1000; position: absolute; height: 100%; width: 100%; background: rgba(0, 255, 255, .7); }
-      #cover a { position: relative; display: block; left: 50%; top: 50%; text-align: center; width: 100px; margin-left: -50px; height: 50px; line-height: 50px; margin-top: -25px; font-size: 16px; font-weight: bold; border: 1px solid; }
-    </style>
-  </head>
-  <body>
-    <div id="cover">
-      <a href="/sign-in">Sign-in</a>
-    </div>
-  </body>
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>textbox</title>
+		<style>
+			#cover { top: 0; left: 0; z-index: 1000; position: absolute; height: 100%; width: 100%; background: rgba(0, 255, 255, .7); }
+			#cover a { position: relative; display: block; left: 50%; top: 50%; text-align: center; width: 100px; margin-left: -50px; height: 50px; line-height: 50px; margin-top: -25px; font-size: 16px; font-weight: bold; border: 1px solid; }
+		</style>
+	</head>
+	<body>
+		<div id="cover">
+			<a href="/sign-in">Sign-in</a>
+		</div>
+	</body>
 </html>`
