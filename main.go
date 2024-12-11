@@ -3,7 +3,6 @@ package main
 import (
 	"database/sql"
 	"flag"
-	"html/template"
 	"io"
 	"log"
 	"net/http"
@@ -13,6 +12,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 
 	"hawx.me/code/indieauth/v2"
+	"hawx.me/code/lmth"
+	"hawx.me/code/lmth/elements"
 	"hawx.me/code/serve"
 )
 
@@ -50,11 +51,6 @@ func run(port, socket, url, me, secret, dbPath string) error {
 		return err
 	}
 
-	tmpl, err := template.New("textbox").Parse(textboxTmpl)
-	if err != nil {
-		return err
-	}
-
 	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS textbox (
 			id NUMBER PRIMARY KEY,
@@ -84,7 +80,7 @@ func run(port, socket, url, me, secret, dbPath string) error {
 		return choose(a, http.NotFoundHandler())
 	}
 
-	mux.Handle("/", choose(handleDisplay(db, tmpl), handleSignIn()))
+	mux.Handle("/", choose(handleDisplay(db), handleSignIn()))
 	mux.Handle("/save", signedIn(handleSave(db)))
 
 	mux.HandleFunc("/sign-in", func(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +105,7 @@ func run(port, socket, url, me, secret, dbPath string) error {
 	return nil
 }
 
-func handleDisplay(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
+func handleDisplay(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			http.Error(w, "", http.StatusMethodNotAllowed)
@@ -130,7 +126,7 @@ func handleDisplay(db *sql.DB, tmpl *template.Template) http.HandlerFunc {
 			return
 		}
 
-		if err := tmpl.Execute(w, v); err != nil {
+		if err := renderTextbox(w, v.Content, v.UpdatedAt); err != nil {
 			log.Println(err)
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -145,7 +141,7 @@ func handleSignIn() http.HandlerFunc {
 			return
 		}
 
-		io.WriteString(w, signInTmpl)
+		renderSignIn(w)
 	}
 }
 
@@ -174,94 +170,82 @@ func handleSave(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-const textboxTmpl = `<!DOCTYPE html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>textbox</title>
-		<style>
-			 html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
-			 form { height: 100%; display: flex; flex-direction: column; }
-			 textarea { display: block; flex: 1; resize: none; padding: 1rem 1.3rem; border: none; font: 1rem/1.5 monospace; }
-			 textarea:focus { outline: none; }
-			 form div { display: flex; justify-content: space-between; margin: .5rem .7rem; }
-			 button { border: 1px solid; color: blue; background: none; border-radius: .2rem; padding: .2rem .5rem; }
-			 button:not(:disabled):hover { background: blue; color: white; border-color: black; }
-			 button:not(:disabled):active { box-shadow: 0 0 0 3px orange; }
-			 button:disabled { color: silver; }
-			 time { color: silver; font: .8rem monospace; }
-			 #menu { position: fixed; right: 1.3rem; text-align: right; list-style: none; font: 1rem/1.5 monospace; color: blue; padding-bottom: 1.5rem; }
-			 #menu:hover { background: white; }
-		</style>
-	</head>
-	<body>
-		<ul id="menu"></ul>
-		<form action="/save" method="post">
-			<textarea autofocus name="textbox">{{ .Content }}</textarea>
-			<div>
-				<button type="submit" disabled>Save</button>
-				<time>{{ .UpdatedAt }}</time>
-			</div>
-		</form>
-		<script>
-			const form = document.querySelector('form');
-			const textarea = document.querySelector('textarea');
-			const button = document.querySelector('button');
-			const menu = document.getElementById('menu');
+func renderTextbox(w io.Writer, content string, updatedAt time.Time) error {
+	w.Write([]byte("<!DOCTYPE html>"))
 
-			function save(event) {
-				if ((event.ctrlKey || event.metaKey) && String.fromCharCode(event.which).toLowerCase() === 's') {
-					event.preventDefault();
-					form.submit();
-					headers();
-				}
-			}
+	doc := elements.Html(lmth.Attr{"lang": "en"},
+		elements.Head(lmth.Attr{},
+			elements.Meta(lmth.Attr{"charset": "utf-8"}),
+			elements.Meta(lmth.Attr{"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
+			elements.Title(lmth.Attr{}, lmth.Text("textbox")),
+			elements.Style(lmth.Attr{}, lmth.Text(`
+				html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
+				form { height: 100%; display: flex; flex-direction: column; }
+				textarea { display: block; flex: 1; resize: none; padding: 1rem 1.3rem; border: none; font: 1rem/1.5 monospace; }
+				form div { display: flex; justify-content: space-between; margin: .5rem .7rem; }
+				button { border: 1px solid; color: blue; background: none; border-radius: .2rem; padding: .2rem .5rem; }
+				button:not(:disabled):hover { background: blue; color: white; border-color: black; }
+				button:not(:disabled):active { box-shadow: 0 0 0 3px orange; }
+				button:disabled { color: silver; }
+				time { color: silver; font: .8rem monospace; }
+			`)),
+		),
+		elements.Body(lmth.Attr{},
+			elements.Form(lmth.Attr{"action": "/save", "method": "post"},
+				elements.Textarea(lmth.Attr{"autofocus": "autofocus", "name": "textbox"}, lmth.Text(content)),
+				elements.Div(lmth.Attr{},
+					elements.Button(lmth.Attr{"type": "submit", "disabled": "disabled"}, lmth.Text("Save")),
+					elements.Time(lmth.Attr{}, lmth.Text(updatedAt.Format(time.RFC3339))),
+				),
+			),
+			elements.Script(lmth.Attr{}, lmth.Text(`
+				const form = document.querySelector('form');
+				const textarea = document.querySelector('textarea');
+				const button = document.querySelector('button');
 
-			function headers() {
-				const headerRe = new RegExp('# (.*)', 'g');
-				while (menu.firstChild) {
-					menu.removeChild(menu.lastChild);
+				function save(event) {
+					if ((event.ctrlKey || event.metaKey) && String.fromCharCode(event.which).toLowerCase() === 's') {
+						event.preventDefault();
+						form.submit();
+					}
 				}
 
-				while ((match = headerRe.exec(textarea.value)) != null) {
-					const li = document.createElement('li');
-					li.textContent = match[1];
-					li.onclick = ((idx) => function() {
-						textarea.focus();
-						textarea.setSelectionRange(idx, idx);
-					})(match.index + match[0].length);
-					menu.appendChild(li);
-				}
-			}
+				document.onkeydown = (event) => {
+					button.disabled = false;
+					document.onkeydown = save;
+				};
 
-			document.onkeydown = (event) => {
-				button.disabled = false;
-				document.onkeydown = save;
-			};
+				const len = textarea.value.length;
+				textarea.focus();
+				textarea.setSelectionRange(len, len);
+			`)),
+		),
+	)
 
-			const len = textarea.value.length;
-			textarea.focus();
-			textarea.setSelectionRange(len, len);
-			headers();
-		</script>
-	</body>
-</html>`
+	_, err := doc.WriteTo(w)
+	return err
+}
 
-const signInTmpl = `<!DOCTYPE html>
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-		<title>textbox</title>
-		<style>
-			#cover { top: 0; left: 0; z-index: 1000; position: absolute; height: 100%; width: 100%; background: rgba(0, 255, 255, .7); }
-			#cover a { position: relative; display: block; left: 50%; top: 50%; text-align: center; width: 100px; margin-left: -50px; height: 50px; line-height: 50px; margin-top: -25px; font-size: 16px; font-weight: bold; border: 1px solid; }
-		</style>
-	</head>
-	<body>
-		<div id="cover">
-			<a href="/sign-in">Sign-in</a>
-		</div>
-	</body>
-</html>`
+func renderSignIn(w io.Writer) error {
+	w.Write([]byte("<!DOCTYPE html>"))
+
+	doc := elements.Html(lmth.Attr{"lang": "en"},
+		elements.Head(lmth.Attr{},
+			elements.Meta(lmth.Attr{"charset": "utf-8"}),
+			elements.Meta(lmth.Attr{"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
+			elements.Title(lmth.Attr{}, lmth.Text("textbox")),
+			elements.Style(lmth.Attr{}, lmth.Text(`
+				#cover { top: 0; left: 0; z-index: 1000; position: absolute; height: 100%; width: 100%; background: rgba(0, 255, 255, .7); }
+				#cover a { position: relative; display: block; left: 50%; top: 50%; text-align: center; width: 100px; margin-left: -50px; height: 50px; line-height: 50px; margin-top: -25px; font-size: 16px; font-weight: bold; border: 1px solid; }
+			`)),
+		),
+		elements.Body(lmth.Attr{},
+			elements.Div(lmth.Attr{"id": "cover"},
+				elements.A(lmth.Attr{"href": "/sign-in"}, lmth.Text("Sign-in")),
+			),
+		),
+	)
+
+	_, err := doc.WriteTo(w)
+	return err
+}
