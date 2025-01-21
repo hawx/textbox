@@ -16,5 +16,5 @@ require (
 	github.com/gorilla/sessions v1.2.1 // indirect
 	github.com/tomnomnom/linkheader v0.0.0-20180905144013-02ca5825eb80 // indirect
 	golang.org/x/net v0.0.0-20220812174116-3211cb980234 // indirect
-	hawx.me/code/lmth v0.0.0-20241206132153-c89b5fbb98df // indirect
+	hawx.me/code/lmth v0.0.0-20250106151649-72af4c31502e // indirect
 )

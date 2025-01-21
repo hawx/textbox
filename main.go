@@ -178,7 +178,7 @@ func renderTextbox(w io.Writer, content string, updatedAt time.Time) error {
 			elements.Meta(lmth.Attr{"charset": "utf-8"}),
 			elements.Meta(lmth.Attr{"name": "viewport", "content": "width=device-width, initial-scale=1.0"}),
 			elements.Title(lmth.Attr{}, lmth.Text("textbox")),
-			elements.Style(lmth.Attr{}, lmth.Text(`
+			elements.Style(lmth.Attr{}, lmth.RawText(`
 				html, body { height: 100%; width: 100%; margin: 0; padding: 0; }
 				form { height: 100%; display: flex; flex-direction: column; }
 				textarea { display: block; flex: 1; resize: none; padding: 1rem 1.3rem; border: none; font: 1rem/1.5 monospace; }
@@ -198,7 +198,7 @@ func renderTextbox(w io.Writer, content string, updatedAt time.Time) error {
 					elements.Time(lmth.Attr{}, lmth.Text(updatedAt.Format(time.RFC3339))),
 				),
 			),
-			elements.Script(lmth.Attr{}, lmth.Text(`
+			elements.Script(lmth.Attr{}, lmth.RawText(`
 				const form = document.querySelector('form');
 				const textarea = document.querySelector('textarea');
 				const button = document.querySelector('button');
